@@ -1,5 +1,6 @@
 import inspect
-from typing import Self
+import uuid
+from typing import Callable, Self
 
 import redis
 
@@ -40,18 +41,22 @@ class AsyncTaskQueue:
             AsyncTaskQueue.instance = self
 
 
-def async_task(func, args: list = [], kwargs: dict = {}):
-    # assert AsyncTaskQueue.instance is None, 'AsyncTaskQueue did not initiated'
+def submit_task(func:Callable, args: list = [], kwargs: dict = {}):
+    '''
+    submit a task to async queue worker 
+    '''
     if not AsyncTaskQueue.instance:
         raise Exception('AsyncTaskQueue did not initiated')
 
     r = AsyncTaskQueue.instance.redis_builder.get_redis()
 
     value = {
-        'path': str(inspect.getfile(func)),
+        'id': uuid.uuid4().hex,
+        'path': inspect.getfile(func),
         'func_name': func.__name__,
         'args': args,
         'kwargs': kwargs,
+        'status': 'submitted',
     }
     byte_data = serialize(value)
     r.lpush('asynctask', byte_data)
