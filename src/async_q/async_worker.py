@@ -1,56 +1,107 @@
 import asyncio
-import importlib.util
 import inspect
 import logging
-import pathlib
+import re
 import traceback
 
 import redis.asyncio as aioredis
 
 from .async_q import AsyncTaskQueue
-from .utils import deserialize
-
-all_tasks = set()
+from .utils import deserialize, get_function_ref, serialize
 
 
-def get_module(path):
-    module_path = pathlib.Path(path)
+class AsyncQueue(asyncio.Queue):
 
-    logging.debug('module spec : %s',  str(module_path))
-    spec = importlib.util.spec_from_file_location(
-        module_path.stem, module_path)
-    # Create the module object from the spec
-    module = importlib.util.module_from_spec(spec)
+    def full(self) -> bool:
+        isFull = super().full()
+        async_q_task = [t.get_name() for t in asyncio.all_tasks(
+        ) if re.match('async-q-task:.*', t.get_name())]
+        logging.debug(f' async_q_task count [queue.full] {len(async_q_task)}')
+        logging.debug(
+            f'AsyncQueue is Full  -> {isFull or len(async_q_task) >= self.maxsize}')
+        return isFull or len(async_q_task) >= self.maxsize
 
-    # Load the module
-    spec.loader.exec_module(module)
-    return module
+    def task_done(self) -> None:
+        super().task_done()
+        self._wakeup_next(self._putters)
+
+    def get_nowait(self):
+        """Remove and return an item from the queue.
+
+        Return an item if one is immediately available, else raise QueueEmpty.
+        """
+        if self.empty():
+            raise asyncio.QueueEmpty
+        item = self._get()
+        return item
 
 
-def get_function(path, func_name):
-    module = get_module(path)
-    return getattr(module, func_name)
+def task_done_callback(task, queue: AsyncQueue, redis, item):
+    data = item['deserialize_data']
+
+    async def inner():
+        await redis.lrem('asynctask_backup', count=1, value=item['original_data'])
+        await redis.set('async-q-task:'+data['id'], serialize({**data, 'status': 'finished'}))
+        async_q_task = [t.get_name() for t in asyncio.all_tasks(
+        ) if re.match('async-q-task:.*', t.get_name())]
+        logging.debug(f' async_q_task count [task_done] {len(async_q_task)}')
+        queue.task_done()
+    asyncio.create_task(inner())
 
 
-async def get_submitted_task(redis: aioredis.Redis):
+async def create_async_task_from_queue(redis: aioredis.Redis, queue: AsyncQueue):
+    while True:
+        # get a unit of work
+        item = await queue.get()
+        if not item:
+            break
+
+        data = item['deserialize_data']
+        fun = item['func_ref']
+        task_id = 'async-q-task:'+data['id']
+
+        # await redis.set('const_task_'+data['id'], value)
+        await redis.set(task_id, serialize({**data, 'status': 'starting'}))
+
+        async def inner():
+            await redis.incr('current-task-worker')
+            logging.debug(f'starting a new task; task_id: {task_id}')
+            coro = fun(*data['args'], **{**data['kwargs'], 'task_id': task_id})
+            await coro
+
+        logging.info('creating a new task..')
+        task = asyncio.create_task(
+            coro=inner(), name=task_id)
+
+        task.add_done_callback(lambda t: task_done_callback(
+            t, queue, redis, item))
+
+
+async def listen_to_submitted_task(redis: aioredis.Redis, queue: AsyncQueue):
 
     while True:
-        (key, value) = await redis.brpop('asynctask')
+        value = await redis.brpoplpush('asynctask', 'asynctask_backup')
+
         data = deserialize(value)
+
+        if not isinstance(data, dict):
+            await redis.lrem('asynctask_backup', count=1, value=value)
+
         logging.debug("deserialize received value : %s", data)
-        fun = await asyncio.to_thread(get_function, data['path'], data['func_name'])
+
+        fun = await asyncio.to_thread(get_function_ref, data['path'], data['func_name'])
         logging.debug('get function ref %s', str(fun))
-        if fun:
-            if inspect.iscoroutinefunction(fun):
-                coro = fun(*data['args'], **data['kwargs'])
-                logging.info('creating task')
-                task = asyncio.create_task(coro=coro)
-                all_tasks.add(task)
-            else:
-                logging.info('submitted function is not coroutine')
+
+        if fun and inspect.iscoroutinefunction(fun):
+            data = {**data, 'status': 'padding'}
+            await redis.set('async-q-task:'+data['id'], serialize(data))
+            await queue.put({'func_ref': fun, 'deserialize_data': data,
+                             'original_data': value})
         else:
+            logging.info('submitted function is not coroutine')
             logging.debug('skipped from creating task')
-            await asyncio.sleep(10)
+
+            await redis.lrem('asynctask_backup', count=1, value=value)
 
 
 async def async_worker():
@@ -58,10 +109,21 @@ async def async_worker():
         Exception('AsyncTaskQueue did not initiated')
 
     r = AsyncTaskQueue.instance.redis_builder.get_redis_async()
+    queue = AsyncQueue(maxsize=10)
     try:
-        await get_submitted_task(r)
+        producer = listen_to_submitted_task(r, queue)
+        consumer = create_async_task_from_queue(r, queue)
+
+        p_task = asyncio.create_task(producer)
+        c_task = asyncio.create_task(consumer)
+
+        await asyncio.gather(p_task, c_task)
+
     except Exception as e:
         logging.error(e)
-        logging.debug('traceback:', traceback.format_exc() )
+        logging.debug('%s', traceback.format_exc())
     finally:
+        p_task.cancel()
+        c_task.cancel()
+
         await r.close()

@@ -1,17 +1,20 @@
 import argparse
 import asyncio
-from .async_worker import async_worker, get_module, AsyncTaskQueue
+
+from .utils import get_module_ref
+from .async_worker import async_worker, AsyncTaskQueue
 import logging
 
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)",
+    filename='async-q-logs.log'
 )
 
 
 async def close():
-    print('Finalazing...')
+    logging.info('Finalazing...')
     await asyncio.sleep(1)
 
 
@@ -24,16 +27,14 @@ if __name__ == "__main__":
 
     [filepath, app_attr] = str(args.app).split(':')
 
-    module = get_module(filepath)
+    module = get_module_ref(filepath)
 
     if not isinstance(getattr(module, app_attr,None), AsyncTaskQueue):
 
         raise Exception(f'{app_attr} should be instance of AsyncTaskQueue')
 
     try:
-        # print(filepath,app_attr)
         loop = asyncio.get_event_loop()
-        loop.set_debug(True)
         loop.run_until_complete(
             async_worker()
         )
