@@ -21,7 +21,7 @@ async def close():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Async task queue worker")
     parser.add_argument("-a", "--app", required=True,
-                        help="application path ex: `async_task_queue -a app.py:async_task_queue_app`")
+                        help="application path ex: `async_q -a app.py:async_task_queue_app`")
 
     args = parser.parse_args()
 
