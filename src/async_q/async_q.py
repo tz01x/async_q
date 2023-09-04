@@ -32,23 +32,34 @@ class RedisBuilder:
 
 
 class AsyncTaskQueue:
-    instance: Self = None
+    _instance: "AsyncTaskQueue" = None
 
     def __init__(self, redis_builder: RedisBuilder):
         self.redis_builder = redis_builder
+        self._concurrency = 100
 
-        if not AsyncTaskQueue.instance:
-            AsyncTaskQueue.instance = self
+        if not AsyncTaskQueue._instance:
+            AsyncTaskQueue._instance = self
+
+    @classmethod
+    def get_instance(cls):
+        return cls._instance
+
+    def set_concurrency(self, c: int):
+        self._concurrency = c
+
+    def get_concurrency(self):
+        return self._concurrency
 
 
-def submit_task(func:Callable, args: list = [], kwargs: dict = {}):
+def submit_task(func: Callable, args: list = [], kwargs: dict = {}):
     '''
     submit a task to async queue worker 
     '''
-    if not AsyncTaskQueue.instance:
+    if not AsyncTaskQueue._instance:
         raise Exception('AsyncTaskQueue did not initiated')
 
-    r = AsyncTaskQueue.instance.redis_builder.get_redis()
+    r = AsyncTaskQueue._instance.redis_builder.get_redis()
 
     value = {
         'id': uuid.uuid4().hex,
