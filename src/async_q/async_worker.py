@@ -105,11 +105,12 @@ async def listen_to_submitted_task(redis: aioredis.Redis, queue: AsyncQueue):
 
 
 async def async_worker():
-    if not AsyncTaskQueue.instance:
+    if not AsyncTaskQueue.get_instance():
         Exception('AsyncTaskQueue did not initiated')
 
-    r = AsyncTaskQueue.instance.redis_builder.get_redis_async()
-    queue = AsyncQueue(maxsize=10)
+    async_task_q = AsyncTaskQueue.get_instance()
+    r = async_task_q.redis_builder.get_redis_async()
+    queue = AsyncQueue(maxsize=async_task_q.get_concurrency())
     try:
         producer = listen_to_submitted_task(r, queue)
         consumer = create_async_task_from_queue(r, queue)
