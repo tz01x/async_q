@@ -6,6 +6,9 @@ import redis
 
 from async_q.utils import serialize
 
+import logging
+from typing import Union
+
 
 class RedisBuilder:
     __redis_sync = None
@@ -35,11 +38,13 @@ class AsyncTaskQueue:
     _instance: "AsyncTaskQueue" = None
 
     def __init__(self, redis_builder: RedisBuilder):
+
         self.redis_builder = redis_builder
         self._concurrency = 100
+        self.logger = logging.getLogger('async-q')
 
         if not AsyncTaskQueue._instance:
-            AsyncTaskQueue._instance = self
+            AsyncTaskQueue._instance = self 
 
     @classmethod
     def get_instance(cls):
@@ -50,6 +55,21 @@ class AsyncTaskQueue:
 
     def get_concurrency(self):
         return self._concurrency
+
+    def config_logger(self, log_level: int = logging.INFO, log_filename: Union[str, None] = None):
+        # configure logger
+        self.logger.setLevel(log_level)
+
+        if log_filename is None:
+            self.handler = logging.StreamHandler()
+        else:
+            self.handler = logging.FileHandler(filename=log_filename)
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)')
+        self.handler.setFormatter(formatter)
+
+        # Add the handler to the logger
+        self.logger.addHandler(self.handler)
 
 
 def submit_task(func: Callable, args: list = [], kwargs: dict = {}):
