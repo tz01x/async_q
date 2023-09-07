@@ -11,7 +11,7 @@ A simple worker task queue with async support
 In scenarios where you need to execute I/O-bound tasks asynchronously within a single application, the "AsyncQ" library provides a straightforward solution. This use case illustrates how to create and utilize the library for such purposes.
 
 ### Prerequisites
-Before using the "AsyncQ" library, ensure you have Python and Redis installed, along with the required dependencies.
+Before using the "AsyncQ" library, ensure you have Python 3.10 and Redis (Version 5.0 to current) installed, along with the required dependencies.
 
 ### Setting Up the Application
 
