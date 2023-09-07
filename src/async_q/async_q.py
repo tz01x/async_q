@@ -1,10 +1,10 @@
 import inspect
 import uuid
-from typing import Callable, Self
+from typing import Callable
 
 import redis
 
-from async_q.utils import serialize
+from async_q.utils import serialize,get_redis_q_key
 
 import logging
 from typing import Union
@@ -38,7 +38,7 @@ class AsyncTaskQueue:
     _instance: "AsyncTaskQueue" = None
 
     def __init__(self, redis_builder: RedisBuilder):
-
+        self.distribute_qname = 'default'
         self.redis_builder = redis_builder
         self._concurrency = 100
         self.logger = logging.getLogger('async-q')
@@ -72,7 +72,7 @@ class AsyncTaskQueue:
         self.logger.addHandler(self.handler)
 
 
-def submit_task(func: Callable, args: list = [], kwargs: dict = {}):
+def submit_task(func: Callable, args: list = [], kwargs: dict = {}, queue_name:str = 'default'):
     '''
     submit a task to async queue worker 
     '''
@@ -90,4 +90,4 @@ def submit_task(func: Callable, args: list = [], kwargs: dict = {}):
         'status': 'submitted',
     }
     byte_data = serialize(value)
-    r.lpush('asynctask', byte_data)
+    r.lpush(get_redis_q_key(queue_name), byte_data)

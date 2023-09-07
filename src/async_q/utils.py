@@ -30,3 +30,12 @@ def serialize(value):
 
 def deserialize(byte_value):
     return msgpack.unpackb(byte_value)
+
+def get_redis_q_key(extra:str=''):
+    return 'async_task:'+extra
+
+def get_redis_q_backup_key(extra:str=''):
+    return 'async_task_backup:'+extra
+
+def get_task_key(extra:str=''):
+    return 'async-q-task:'+extra

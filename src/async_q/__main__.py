@@ -18,6 +18,7 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--concurrency', default=100, type=int,
                         required=False,
                         help='limit the number of concurrent execution, default is 100.')
+    parser.add_argument('-q','--queue',default='default', type=str)
     parser.add_argument('-ll', '--log_level', default='INFO', type=str,
                         required=False,
                         choices=list(logging.getLevelNamesMapping().keys()),
@@ -45,6 +46,7 @@ if __name__ == "__main__":
         log_level=logging.getLevelName(args.log_level),
         log_filename=args.log_filename
     )
+    async_task_queue.distribute_qname = args.queue
 
     try:
         async_task_queue.logger.info(f'Staring workers with {args.concurrency} concurrency')
