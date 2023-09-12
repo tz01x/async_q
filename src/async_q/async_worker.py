@@ -3,17 +3,22 @@ import inspect
 import logging
 import re
 import traceback
+import copy
+from typing import Any, Dict
 
 import redis.asyncio as aioredis
 
 from .async_q import AsyncTaskQueue
 from .utils import (
+    QueueItem,
+    TaskMetaData,
     deserialize,
     get_function_ref,
     serialize,
     get_redis_q_key,
     get_redis_q_backup_key,
-    get_task_key
+    get_task_key,
+    to_thread
 )
 
 
@@ -42,45 +47,50 @@ class AsyncQueue(asyncio.Queue):
         item = self._get()
         return item
 
+async def _task_done(task:asyncio.Task, queue: AsyncQueue, distribute_qname: str, redis: aioredis.Redis, logger):
+    item_:QueueItem = task.result()
+    data = item_.deserialize_data
+    data = copy.deepcopy(data)
+    logger.debug(
+        f"removing {item_.original_data} from {get_redis_q_backup_key(distribute_qname)}")
+    r = await redis.lrem(get_redis_q_backup_key(distribute_qname), count=0, value=item_.original_data)
+    logger.debug(f"removed item from backup queue & status is : {r}")
+    data.status = 'finished'
+    await redis.set(get_task_key(data.id), serialize(data), 60*60)
+    # async_q_task = [t.get_name() for t in asyncio.all_tasks(
+    # ) if re.match('async-q-task:.*', t.get_name())]
+    # logger.debug(f' async_q_task count [task_done] {len(async_q_task)}')
+    queue.task_done()
 
-def task_done_callback(task, queue: AsyncQueue, distribute_qname: str, redis, item, logger):
-    data = item['deserialize_data']
+def task_done_callback(task, queue: AsyncQueue, distribute_qname: str, redis: aioredis.Redis, logger):
+    asyncio.create_task(_task_done(task, queue, distribute_qname, redis, logger))
 
-    async def inner():
-        await redis.lrem(get_redis_q_backup_key(distribute_qname), count=1, value=item['original_data'])
-        await redis.set(get_task_key(data['id']), serialize({**data, 'status': 'finished'}))
-        # async_q_task = [t.get_name() for t in asyncio.all_tasks(
-        # ) if re.match('async-q-task:.*', t.get_name())]
-        # logger.debug(f' async_q_task count [task_done] {len(async_q_task)}')
-        queue.task_done()
-    asyncio.create_task(inner())
 
+async def _task_inner(tkey, func, item:QueueItem, redis, logger):
+    meta_data = copy.deepcopy(item.deserialize_data)
+    meta_data.status = 'starting'
+    await redis.set(tkey, serialize(meta_data))
+    logger.debug(f'starting a new task; task_id: {tkey}')
+    coro = func(*meta_data.args, **{**meta_data.kwargs, 'task_id': tkey})
+    await coro
+    return item
 
 async def create_async_task_from_queue(distribute_qname: str, redis: aioredis.Redis, queue: AsyncQueue, logger):
     while True:
         # get a unit of work
-        item = await queue.get()
+        item: QueueItem = await queue.get()
         if not item:
             break
 
-        data = {**item['deserialize_data']}
-        func_ref = item['func_ref']
-        task_key = get_task_key(data['id'])
+        func_ref = item.func_ref
+        task_key = get_task_key(item.deserialize_data.id)
 
-        # await redis.set('const_task_'+data['id'], value)
-
-        async def inner(tkey, func, data_):
-            await redis.set(tkey, serialize({**data_, 'status': 'starting'}))
-            logger.debug(f'starting a new task; task_id: {tkey}')
-            coro = func(*data_['args'], **{**data_['kwargs'], 'task_id': tkey})
-            await coro
 
         logger.info(f'creating a new task: {task_key}')
         task = asyncio.create_task(
-            coro=inner(task_key, func_ref, data), name=task_key)
+            coro=_task_inner(task_key, func_ref, item,redis, logger), name=task_key)
 
-        task.add_done_callback(lambda t: task_done_callback(
-            t, queue, distribute_qname, redis, item, logger))
+        task.add_done_callback(lambda t: task_done_callback(t, queue, distribute_qname, redis, logger))
 
 
 async def listen_to_submitted_task(distribute_qname: str, redis: aioredis.Redis, queue: AsyncQueue, logger):
@@ -96,20 +106,19 @@ async def listen_to_submitted_task(distribute_qname: str, redis: aioredis.Redis,
 
         data = deserialize(value)
 
-        if not isinstance(data, dict):
-            await redis.lrem(get_redis_q_backup_key(distribute_qname), count=1, value=value)
+        if not isinstance(data, TaskMetaData):
+            assert 1 == await redis.lrem(get_redis_q_backup_key(distribute_qname), count=1, value=value), "can not remove invalid data from q backup"
             logging.error("submitted task is not dict type")
 
         logger.debug("deserialize received value : %s", data)
 
-        fun = await asyncio.to_thread(get_function_ref, data['path'], data['func_name'])
+        fun = await to_thread(get_function_ref, data.path, data.func_name)
         logger.debug('get function ref %s', str(fun))
 
         if fun and inspect.iscoroutinefunction(fun):
-            data = {**data, 'status': 'padding'}
-            await redis.set(get_task_key(data['id']), serialize(data))
-            await queue.put({'func_ref': fun, 'deserialize_data': data,
-                             'original_data': value})
+            data.status = 'pandding'
+            await redis.set(get_task_key(data.id), serialize(data))
+            await queue.put(QueueItem(func_ref=fun, deserialize_data=data, original_data=value))
         else:
             logger.info('submitted function is not coroutine')
             logger.debug('skipped from creating task')

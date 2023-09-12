@@ -4,10 +4,11 @@ from typing import Callable
 
 import redis
 
-from async_q.utils import serialize,get_redis_q_key
+from async_q.utils import TaskMetaData, serialize,get_redis_q_key
 
 import logging
 from typing import Union
+
 
 
 class RedisBuilder:
@@ -89,5 +90,5 @@ def submit_task(func: Callable, args: list = [], kwargs: dict = {}, queue_name:s
         'kwargs': kwargs,
         'status': 'submitted',
     }
-    byte_data = serialize(value)
+    byte_data = serialize(TaskMetaData(**value))
     r.lpush(get_redis_q_key(queue_name), byte_data)
