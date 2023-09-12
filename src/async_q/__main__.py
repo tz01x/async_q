@@ -21,7 +21,7 @@ if __name__ == "__main__":
     parser.add_argument('-q','--queue',default='default', type=str)
     parser.add_argument('-ll', '--log_level', default='INFO', type=str,
                         required=False,
-                        choices=list(logging.getLevelNamesMapping().keys()),
+                        choices=list(logging._nameToLevel.keys()),
                         help='log level `-ll INFO`, default loglevel is INFO')
 
     parser.add_argument('-lf', '--log_filename', default=None, type=str,
