@@ -16,7 +16,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-
+keywords = ["async", "workers", "queue", "redis" , "distributed"]
 dependencies = [ 
   "redis==5.0.0",
   "msgpack",
