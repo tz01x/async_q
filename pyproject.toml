@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "async_q"
-version = "0.0.2"
+version = "0.2"
 authors = [
-  { name="tumzied_", email="50454992+tz01x@users.noreply.github.com" },
+  { name="tumzied_", email="abdur.rahman.tumzied.ewu@gmail.com" },
 ]
 description = "A simple worker task queue with async support "
 readme = "README.md"
