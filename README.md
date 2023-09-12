@@ -1,10 +1,14 @@
 # AsyncQ
 A simple worker task queue with async support
+## Installation
+```bash
+pip install async_q
+```
 
 ## Features
-1. submit asynchronously task 
+1. Submit asynchronously task 
 2. Task routing
-3. distributed async worker
+3. Distributed async worker process
 
 ## Use Case: Asynchronous Task Queue for I/O-Bound Task Processing
 
@@ -12,7 +16,8 @@ A simple worker task queue with async support
 In scenarios where you need to execute I/O-bound tasks asynchronously within a single application, the "async_q" library provides a straightforward solution. This use case illustrates how to create and utilize the library for such purposes.
 
 ### Prerequisites
-Before using the "async_q" library, ensure you have Python 3.10 and Redis (Version 5.0 to current) installed, along with the required dependencies.
+Before using the "async_q" library, ensure you have Python 3.8 and Redis (Version 5.0 to current) installed, along with the required dependencies.
+
 
 ### Setting Up the Application
 
