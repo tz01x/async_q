@@ -1,0 +1,6 @@
+django~=4.2.7
+async-q
+uvicorn[standard]
+aiohttp
+beautifulsoup4
+daphne
