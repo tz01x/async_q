@@ -1,0 +1,8 @@
+<ul class="fs-6 list-group">
+    {%for item in queued_items%}
+    <li class="list-group-item">process #{{forloop.counter}} {{item.status}}</li>
+    {%empty%}
+    <li class="list-group-item"><small>No process is running...</small></li>
+    {%endfor%}
+</ul>
+

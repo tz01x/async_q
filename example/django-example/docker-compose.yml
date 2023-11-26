@@ -1,0 +1,21 @@
+version: '2'
+services:
+  djanog-web:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 8000:8000
+    command: uvicorn core.asgi:application --reload --host 0.0.0.0 --port 8000
+    volumes:
+      - .:/app
+  async-worker:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    command: python -m async_q -a core/asgi.py:async_q_app -c 5 -ll DEBUG
+    volumes:
+      - .:/app
+  redis:
+    image: redis:latest
+  

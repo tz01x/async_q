@@ -1,0 +1,41 @@
+<ul data-total="{{total_count}}">
+
+    {% for item in product_items%}
+    <li data-asin="{{item.asin}}" class="d-flex gap-4 mt-5" data-is-new="{{item.is_new}}">
+        <img src="{{item.img_src}}" loading="lazy" width="100" height="100" style="object-fit: cover;" />
+        <div class="basis-full">
+            <h2 class="fs-5">
+                {{item.title}}
+                {%if item.is_new%}
+                <span class="badge bg-secondary" title="newly added/updated">New</span>
+                {%endif%}
+            </h2>
+            <div>
+                Price: {{item.price}}
+            </div>
+            <div>
+                Last updated: <small>{{item.updated_at}}</small>
+            </div>
+
+        </div>
+    </li>
+    {% endfor %}
+
+    <nav aria-label="Page navigation example">
+        <ul class="pagination justify-content-center">
+          
+          {%for page_num in pages%}
+          {%if page_num%}
+          <li class="page-item"><a class="page-link" href="/?page={{page_num}}">{{page_num}}</a></li>
+          {%else%}
+          <li class="page-item"><a class="page-link" href="#">...</a></li>
+          {%endif%}
+          {%endfor%}
+
+
+
+
+        </ul>
+
+      </nav>
+</ul>

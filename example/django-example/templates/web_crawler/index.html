@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>django example</title>
+    <script src="https://unpkg.com/htmx.org@1.9.9"></script>
+      <!-- Bootstrap CSS -->
+      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+
+</head>
+<body>
+   
+    <section>
+        
+        <main class="container">
+            <header>
+                <h1>
+                    Latest GPUS price listing..
+                </h1>
+            </header>
+            <div class="row ">
+                <div class="col-md-8" hx-get="/gpu-list?page={{page}}" hx-trigger="load, every 5s"></div>
+                <div class="col-md-4">
+                    <button hx-get="/api/submit-task" hx-swap="none" hx-trigger="click" id="submitBtn" class="btn btn-primary" type="button">Fetch Data in Background</button>
+
+                    <div class="mt-2" hx-get="/get-running-tasks" hx-trigger="load, click from:#submitBtn , every 110s"></div>
+                </div>
+                
+            </div>
+
+        </main>
+    </section>
+    
+</body>
+</html>
