@@ -61,16 +61,12 @@ async def submit_amazon_web_crawl_task_view(request):
 
     page = request.GET.get('page', 1)
     
-    # submitting background task
+    # submitting background task to crawl amazon to get item related to gpu
 
-    submit_task(crawl_amazon_for_gpu,
-                args=[page])
-    submit_task(crawl_amazon_for_gpu,
-                args=[page+1])
-    submit_task(crawl_amazon_for_gpu,
-                args=[page+2])
-    submit_task(crawl_amazon_for_gpu,
-                args=[page+3])
+    submit_task(crawl_amazon_for_gpu, args=[page])
+    submit_task(crawl_amazon_for_gpu, args=[page+1])
+    submit_task(crawl_amazon_for_gpu, args=[page+2])
+    submit_task(crawl_amazon_for_gpu, args=[page+3])
 
     return JsonResponse(data={'detail': 'task submitted'})
 
