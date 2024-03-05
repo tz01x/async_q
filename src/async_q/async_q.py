@@ -1,6 +1,6 @@
 import inspect
 import uuid
-from typing import Callable
+from typing import Optional, Callable
 
 import redis
 
@@ -73,10 +73,12 @@ class AsyncTaskQueue:
         self.logger.addHandler(self.handler)
 
 
-def submit_task(func: Callable, args: list = [], kwargs: dict = {}, queue_name:str = 'default'):
+def submit_task(func: Callable, args: Optional[list] = None, kwargs: Optional[dict] = None, queue_name:str = 'default'):
     '''
     submit a task to async queue worker 
     '''
+    args = [] if args is None else args
+    kwargs = {} if kwargs is None else kwargs
     if not AsyncTaskQueue._instance:
         raise Exception('AsyncTaskQueue did not initiated')
 
