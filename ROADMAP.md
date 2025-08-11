@@ -22,6 +22,7 @@ This document outlines high‑impact cleanups, reliability hardening, and new fe
 
 ### Reliability and operations
 - [ ] Graceful shutdown: handle signals (SIGINT/SIGTERM), cancel producer/consumer, drain queue, and update task statuses cleanly.
+- [x] Graceful shutdown: handle signals (SIGINT/SIGTERM), cancel producer/consumer, drain queue, and update task statuses cleanly.
 - [ ] Retries with exponential backoff and max attempts; send failed tasks to a dead‑letter queue.
 - [ ] Per‑task timeout and cancellation support.
 - [ ] Heartbeats + visibility timeout: periodically move stuck items from backup to main if worker is dead or exceeds visibility timeout.
