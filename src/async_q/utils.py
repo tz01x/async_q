@@ -45,13 +45,13 @@ def get_function_ref(path, func_name):
     return getattr(module, func_name)
 
 
-def serialize(value:TaskMetaData):
+def serialize(value: TaskMetaData):
     val_dict = dataclasses.asdict(value)
-    return msgpack.packb(val_dict)
+    return msgpack.packb(val_dict, use_bin_type=True)
 
 
 def deserialize(byte_value) -> TaskMetaData:
-    val_dict =  msgpack.unpackb(byte_value)
+    val_dict = msgpack.unpackb(byte_value, raw=False)
     return TaskMetaData(**val_dict)
 
 def get_redis_q_key(extra:str=''):

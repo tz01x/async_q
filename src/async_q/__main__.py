@@ -2,12 +2,13 @@ import argparse
 import asyncio
 
 from .utils import get_module_ref
-from .async_worker import async_worker, AsyncTaskQueue
+from .async_worker import async_worker
+from .async_q import AsyncTaskQueue
 import logging
 
 
 async def close():
-    logging.info('Finalazing...')
+    logging.info('Finalizing...')
     await asyncio.sleep(1)
 
 
@@ -49,7 +50,7 @@ if __name__ == "__main__":
     async_task_queue.distribute_qname = args.queue
 
     try:
-        async_task_queue.logger.info(f'Staring workers with {args.concurrency} concurrency')
+        async_task_queue.logger.info(f'Starting workers with {args.concurrency} concurrency')
         loop = asyncio.get_event_loop()
         loop.run_until_complete(
             async_worker()

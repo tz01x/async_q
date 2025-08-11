@@ -47,7 +47,7 @@ class AsyncQueue(asyncio.Queue):
         item = self._get()
         return item
 
-async def _task_done(task:asyncio.Task, queue: AsyncQueue, distribute_qname: str, redis: aioredis.Redis, logger):
+async def _task_done(task: asyncio.Task, queue: AsyncQueue, distribute_qname: str, redis: aioredis.Redis, logger):
     item_:QueueItem = task.result()
     data = item_.deserialize_data
     data = copy.deepcopy(data)
@@ -56,7 +56,7 @@ async def _task_done(task:asyncio.Task, queue: AsyncQueue, distribute_qname: str
     r = await redis.lrem(get_redis_q_backup_key(distribute_qname), count=0, value=item_.original_data)
     logger.debug(f"removed item from backup queue & status is : {r}")
     data.status = 'finished'
-    await redis.set(get_task_key(data.id), serialize(data), 60*60)
+    await redis.set(get_task_key(data.id), serialize(data), ex=60 * 60)
     # async_q_task = [t.get_name() for t in asyncio.all_tasks(
     # ) if re.match('async-q-task:.*', t.get_name())]
     # logger.debug(f' async_q_task count [task_done] {len(async_q_task)}')
@@ -66,7 +66,7 @@ def task_done_callback(task, queue: AsyncQueue, distribute_qname: str, redis: ai
     asyncio.create_task(_task_done(task, queue, distribute_qname, redis, logger))
 
 
-async def _task_inner(tkey, func, item:QueueItem, redis, logger):
+async def _task_inner(tkey, func, item: QueueItem, redis, logger):
     meta_data = copy.deepcopy(item.deserialize_data)
     meta_data.status = 'starting'
     await redis.set(tkey, serialize(meta_data))
@@ -116,7 +116,7 @@ async def listen_to_submitted_task(distribute_qname: str, redis: aioredis.Redis,
         logger.debug('get function ref %s', str(fun))
 
         if fun and inspect.iscoroutinefunction(fun):
-            data.status = 'pandding'
+            data.status = 'pending'
             await redis.set(get_task_key(data.id), serialize(data))
             await queue.put(QueueItem(func_ref=fun, deserialize_data=data, original_data=value))
         else:
@@ -134,6 +134,9 @@ async def async_worker():
     r = async_task_q.redis_builder.get_redis_async()
     queue = AsyncQueue(maxsize=async_task_q.get_concurrency())
     try:
+        p_task = None
+        c_task = None
+
         producer = listen_to_submitted_task(
             async_task_q.distribute_qname, r, queue, async_task_q.logger)
         consumer = create_async_task_from_queue(
@@ -148,7 +151,13 @@ async def async_worker():
         async_task_q.logger.error(e)
         async_task_q.logger.debug('%s', traceback.format_exc())
     finally:
-        p_task.cancel()
-        c_task.cancel()
+        # Safely cancel tasks if they were created
+        try:
+            if p_task is not None:
+                p_task.cancel()
+            if c_task is not None:
+                c_task.cancel()
+        except Exception:
+            pass
 
         await r.close()

@@ -70,9 +70,9 @@ In the previous example, the `submit_task` function also includes a `queue` argu
 
 ```python
 if __name__ == '__main__':
-    for i in range(20):
-        # Submit a task with a default queue value
-        submit_task(my_task, kwargs={'idx': i, 'delay': 10, 'queue': 'default'})
+     for i in range(20):
+         # Submit a task with an explicit queue name
+         submit_task(my_task, kwargs={'idx': i, 'delay': 10}, queue_name='default')
 ```
 
 ### Running Worker Processes

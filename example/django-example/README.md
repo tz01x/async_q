@@ -27,7 +27,7 @@ from web_crawler.service import crawl_amazon_for_gpu
 
 async def submit_amazon_web_crawl_task_view(request):
 
-    page = request.GET.get('page', 1)
+    page = int(request.GET.get('page', 1))
     
     # submitting background task to crawl amazon to get item related to gpu
 

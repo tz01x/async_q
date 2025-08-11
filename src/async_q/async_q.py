@@ -1,10 +1,10 @@
 import inspect
 import uuid
-from typing import Callable
+from typing import Callable, List, Dict, Optional, Union
 
 import redis
 
-from async_q.utils import TaskMetaData, serialize,get_redis_q_key
+from async_q.utils import TaskMetaData, serialize, get_redis_q_key
 
 import logging
 from typing import Union
@@ -15,7 +15,7 @@ class RedisBuilder:
     __redis_sync = None
     __redis_async = None
 
-    def __init__(self, host: str = 'localhost', port: int = 6379, username: str = None, password: str = None, **kwargs):
+    def __init__(self, host: str = 'localhost', port: int = 6379, username: Optional[str] = None, password: Optional[str] = None, **kwargs):
         self.kwargs = {
             'host': host,
             'port': port,
@@ -51,32 +51,51 @@ class AsyncTaskQueue:
     def get_instance(cls):
         return cls._instance
 
-    def set_concurrency(self, c: int):
+    def set_concurrency(self, c: int) -> None:
         self._concurrency = c
 
-    def get_concurrency(self):
+    def get_concurrency(self) -> int:
         return self._concurrency
 
-    def config_logger(self, log_level: int = logging.INFO, log_filename: Union[str, None] = None):
-        # configure logger
+    def config_logger(self, log_level: int = logging.INFO, log_filename: Optional[str] = None) -> None:
+        """Configure library logger with a single handler.
+
+        Repeated calls will replace existing handlers to avoid duplicates.
+        """
         self.logger.setLevel(log_level)
+        # Remove existing handlers to prevent duplicates
+        for h in list(self.logger.handlers):
+            self.logger.removeHandler(h)
 
+        handler: logging.Handler
         if log_filename is None:
-            self.handler = logging.StreamHandler()
+            handler = logging.StreamHandler()
         else:
-            self.handler = logging.FileHandler(filename=log_filename)
+            handler = logging.FileHandler(filename=log_filename)
+
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)')
-        self.handler.setFormatter(formatter)
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)'
+        )
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+        # Do not propagate to root logger by default
+        self.logger.propagate = False
 
-        # Add the handler to the logger
-        self.logger.addHandler(self.handler)
 
+def submit_task(
+    func: Callable,
+    args: Optional[List[object]] = None,
+    kwargs: Optional[Dict[str, object]] = None,
+    queue_name: str = 'default',
+) -> None:
+    """Submit a coroutine function for asynchronous execution.
 
-def submit_task(func: Callable, args: list = [], kwargs: dict = {}, queue_name:str = 'default'):
-    '''
-    submit a task to async queue worker 
-    '''
+    Parameters:
+        func: async callable to execute on workers
+        args: positional arguments for the task
+        kwargs: keyword arguments for the task
+        queue_name: target queue name
+    """
     if not AsyncTaskQueue._instance:
         raise Exception('AsyncTaskQueue did not initiated')
 
@@ -86,8 +105,8 @@ def submit_task(func: Callable, args: list = [], kwargs: dict = {}, queue_name:s
         'id': uuid.uuid4().hex,
         'path': inspect.getfile(func),
         'func_name': func.__name__,
-        'args': args,
-        'kwargs': kwargs,
+        'args': [] if args is None else args,
+        'kwargs': {} if kwargs is None else kwargs,
         'status': 'submitted',
     }
     byte_data = serialize(TaskMetaData(**value))
