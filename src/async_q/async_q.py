@@ -1,13 +1,13 @@
 import inspect
 import uuid
-from typing import Callable, List, Dict, Optional, Union
+from typing import Callable, List, Dict, Optional
 
 import redis
+import redis.asyncio as aioredis
 
-from async_q.utils import TaskMetaData, serialize, get_redis_q_key
+from .utils import TaskMetaData, serialize, get_redis_q_key
 
 import logging
-from typing import Union
 
 
 
@@ -29,14 +29,16 @@ class RedisBuilder:
             self.__redis_sync = redis.Redis(**self.kwargs)
         return self.__redis_sync
 
-    def get_redis_async(self) -> redis.asyncio.Redis:
+    def get_redis_async(self) -> aioredis.Redis:
         if not self.__redis_async:
-            self.__redis_async = redis.asyncio.Redis(**self.kwargs)
+            self.__redis_async = aioredis.Redis(**self.kwargs)
         return self.__redis_async
 
 
 class AsyncTaskQueue:
-    _instance: "AsyncTaskQueue" = None
+    """Singleton-like container for AsyncQ configuration and logging."""
+
+    _instance: Optional["AsyncTaskQueue"] = None
 
     def __init__(self, redis_builder: RedisBuilder):
         self.distribute_qname = 'default'
@@ -48,10 +50,12 @@ class AsyncTaskQueue:
             AsyncTaskQueue._instance = self 
 
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls) -> Optional["AsyncTaskQueue"]:
         return cls._instance
 
     def set_concurrency(self, c: int) -> None:
+        if c <= 0:
+            raise ValueError("concurrency must be a positive integer")
         self._concurrency = c
 
     def get_concurrency(self) -> int:
@@ -99,6 +103,9 @@ def submit_task(
     if not AsyncTaskQueue._instance:
         raise Exception('AsyncTaskQueue did not initiated')
 
+    if not inspect.iscoroutinefunction(func):
+        raise TypeError('submit_task requires an async function (coroutine)')
+
     r = AsyncTaskQueue._instance.redis_builder.get_redis()
 
     value = {
@@ -109,5 +116,5 @@ def submit_task(
         'kwargs': {} if kwargs is None else kwargs,
         'status': 'submitted',
     }
-    byte_data = serialize(TaskMetaData(**value))
+    byte_data: bytes = serialize(TaskMetaData(**value))
     r.lpush(get_redis_q_key(queue_name), byte_data)

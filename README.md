@@ -82,16 +82,36 @@ if __name__ == '__main__':
 
 #### 4. Initializing Worker Processes
 
-In order to efficiently handle incoming tasks, it's crucial to set up and launch worker processes. The level of concurrency can be precisely determined by employing the `-c` flag. In the following example, we will initiate five worker processes that target the `async_q_app` module specified in `main_app.py`. By default, these workers will exclusively process tasks from the `default` queue.
+In order to efficiently handle incoming tasks, it's crucial to set up and launch worker processes. The level of concurrency can be precisely determined by employing the `-c` flag. You can now provide the app in multiple ways:
+
+- File path form (original):
 
 ```bash
-$ python -m async_q -a main_app.py:async_q_app -c 5
+python -m async_q -a main_app.py:async_q_app -c 5
 ```
 
-However, you also have the flexibility to assign specific workers to process tasks from different queues, as demonstrated below:
+- Dotted module path (portable across machines):
 
 ```bash
-$ python -m async_q -a main_app.py:async_q_app -c 5 -q mail_ps
+python -m async_q -a main_app:async_q_app -c 5
+```
+
+- Environment variable (omit `-a`):
+
+```bash
+# Bash
+export ASYNC_Q_APP=main_app:async_q_app
+python -m async_q -c 5
+
+# Windows PowerShell
+$env:ASYNC_Q_APP='main_app:async_q_app'
+python -m async_q -c 5
+```
+
+By default, these workers will process tasks from the `default` queue. You can assign specific workers to other queues as needed:
+
+```bash
+python -m async_q -a main_app:async_q_app -c 5 -q mail_ps
 ```
 
 By making these adjustments, you can tailor the behavior of your worker processes to suit your application's specific requirements.
