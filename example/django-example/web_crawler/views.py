@@ -59,7 +59,7 @@ def list_amazon_product_item(request):
 
 async def submit_amazon_web_crawl_task_view(request):
 
-    page = request.GET.get('page', 1)
+    page = int(request.GET.get('page', 1))
     
     # submitting background task to crawl amazon to get item related to gpu
 
@@ -72,23 +72,25 @@ async def submit_amazon_web_crawl_task_view(request):
 
 from async_q.utils import deserialize
 
-# task status are
-        # pandding
-        # submitted
-        # starting
-        # finished
+# task statuses are
+#         pending
+#         submitted
+#         starting
+#         finished
         
 
 async def get_current_submitted_task_element(request):
-    
-    
+
     redis = AsyncTaskQueue.get_instance().redis_builder.get_redis_async()
     items = []
-    keys = await redis.keys(get_task_key('*'))
-    for key in keys:
+
+    # Use SCAN to avoid blocking Redis on large keyspaces
+    async for key in redis.scan_iter(match=get_task_key('*')):
         byte = await redis.get(key)
+        if not byte:
+            continue
         item = deserialize(byte_value=byte)
-        if item.status!='finished':
+        if item.status != 'finished':
             items.append(item)
     
     context = {
