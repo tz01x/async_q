@@ -9,16 +9,16 @@ This document outlines high‑impact cleanups, reliability hardening, and new fe
 - Minimal logging/observability; no retries, scheduling, or result backend beyond basic status keys
 
 ### High‑priority fixes (short term)
-- [ ] Avoid mutable default arguments in `submit_task` (`args=[]`, `kwargs={}`) → use `None` defaults and normalize inside.
-- [ ] Fix typos and inconsistent status values: "pandding" → "pending"; "Finalazing" → "Finalizing"; "Staring" → "Starting".
-- [ ] Make `msgpack.unpackb` explicit: `raw=False` to avoid bytes for strings across versions.
-- [ ] Guard logger handler duplication in `AsyncTaskQueue.config_logger` (avoid adding multiple handlers).
-- [ ] Use named args for Redis `set` TTL: `await redis.set(key, value, ex=3600)`.
-- [ ] Align README API: `submit_task` uses `queue_name`, not `kwargs['queue']`.
-- [ ] Handle undefined `p_task`/`c_task` in `async_worker` `finally` if startup fails.
-- [ ] Replace `redis.keys('pattern')` in example view with `SCAN` to avoid blocking Redis.
+- [x] Avoid mutable default arguments in `submit_task` (`args=[]`, `kwargs={}`) → use `None` defaults and normalize inside.
+- [x] Fix typos and inconsistent status values: "pandding" → "pending"; "Finalazing" → "Finalizing"; "Staring" → "Starting".
+- [x] Make `msgpack.unpackb` explicit: `raw=False` to avoid bytes for strings across versions.
+- [x] Guard logger handler duplication in `AsyncTaskQueue.config_logger` (avoid adding multiple handlers).
+- [x] Use named args for Redis `set` TTL: `await redis.set(key, value, ex=3600)`.
+- [x] Align README API: `submit_task` uses `queue_name`, not `kwargs['queue']`.
+- [x] Handle undefined `p_task`/`c_task` in `async_worker` `finally` if startup fails.
+- [x] Replace `redis.keys('pattern')` in example view with `SCAN` to avoid blocking Redis.
 - [ ] Add type hints and docstrings across public APIs; enable `mypy` and `ruff`/`flake8`.
-- [ ] Pin compatible dependency ranges (e.g., `redis>=5,<6`, `msgpack>=1.0,<2`).
+- [x] Pin compatible dependency ranges (e.g., `redis>=5,<6`, `msgpack>=1.0,<2`).
 
 ### Reliability and operations
 - [ ] Graceful shutdown: handle signals (SIGINT/SIGTERM), cancel producer/consumer, drain queue, and update task statuses cleanly.
@@ -63,14 +63,14 @@ This document outlines high‑impact cleanups, reliability hardening, and new fe
 - [ ] Add `async_q --version`, `--config` file support (TOML/YAML).
 
 ### Documentation
-- [ ] Update README with correct `submit_task` signature and multi‑queue examples.
+- [x] Update README with correct `submit_task` signature and multi‑queue examples.
 - [ ] Add architecture docs (queue, backup, ack flow) and sequence diagrams.
 - [ ] Usage guides for Django/FastAPI, deployment, and scaling patterns.
 - [ ] Troubleshooting guide (Redis connectivity, stuck tasks, memory, timeouts).
 
 ### Example app fixes (django-example)
-- [ ] Replace `redis.keys('*')` in `get_current_submitted_task_element` with `SCAN`.
-- [ ] `requirements.txt`: use `async_q` (not `async-q`), and pin versions; add `redis`.
+- [x] Replace `redis.keys('*')` in `get_current_submitted_task_element` with `SCAN`.
+- [x] `requirements.txt`: use `async_q` (not `async-q`), and pin versions; add `redis`.
 - [ ] The file writer appends raw JSON fragments; either write NDJSON or proper arrays.
 - [ ] Ensure async views run under ASGI (Daphne/Uvicorn) and document setup.
 
