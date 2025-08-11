@@ -73,6 +73,7 @@ if __name__ == '__main__':
      for i in range(20):
          # Submit a task with an explicit queue name
          submit_task(my_task, kwargs={'idx': i, 'delay': 10}, queue_name='default')
+         # You can control retries by setting defaults in your task payload later (max_retries, backoff_* fields)
 ```
 
 ### Running Worker Processes

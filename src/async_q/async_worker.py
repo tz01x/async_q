@@ -18,7 +18,9 @@ from .utils import (
     get_redis_q_key,
     get_redis_q_backup_key,
     get_task_key,
-    to_thread
+    to_thread,
+    get_retry_zset_key,
+    get_dead_letter_key,
 )
 
 
@@ -68,13 +70,29 @@ async def _task_done(task: asyncio.Task, queue: AsyncQueue, distribute_qname: st
         await redis.lrem(get_redis_q_backup_key(distribute_qname), count=1, value=item.original_data)
         await redis.lpush(get_redis_q_key(distribute_qname), item.original_data)
     except Exception as e:
-        # Mark as failed and remove from backup to avoid infinite retries (no DLQ yet)
+        # Failure: compute retry or DLQ
         logger.error("task failed: %s", e)
         logger.debug('%s', traceback.format_exc())
         meta = copy.deepcopy(item.deserialize_data)
         meta.status = 'failed'
-        await redis.set(get_task_key(meta.id), serialize(meta))
+        # Remove from backup queue
         await redis.lrem(get_redis_q_backup_key(distribute_qname), count=1, value=item.original_data)
+
+        if meta.attempt < meta.max_retries:
+            meta.attempt += 1
+            # Exponential backoff with jitter can be added; keep simple deterministic for now
+            delay = min(meta.backoff_base * (meta.backoff_factor ** (meta.attempt - 1)), meta.backoff_max)
+            import time
+            score = time.time() + delay
+            meta.next_retry_at = score
+            await redis.set(get_task_key(meta.id), serialize(meta))
+            await redis.zadd(get_retry_zset_key(distribute_qname), {item.original_data: score})
+            logger.info('scheduled retry #%s in %.2fs for %s', meta.attempt, delay, meta.id)
+        else:
+            # Send to DLQ
+            await redis.set(get_task_key(meta.id), serialize(meta))
+            await redis.lpush(get_dead_letter_key(distribute_qname), item.original_data)
+            logger.warning('moved task %s to DLQ after %s attempts', meta.id, meta.attempt)
     finally:
         queue.task_done()
 
@@ -128,6 +146,20 @@ async def listen_to_submitted_task(distribute_qname: str, redis: aioredis.Redis,
         )
 
         if value is None:
+            # Also check retry ZSET for due items
+            import time
+            now = time.time()
+            try:
+                # Fetch one due item
+                due = await redis.zrangebyscore(get_retry_zset_key(distribute_qname), min=-1, max=now, start=0, num=1)
+                if due:
+                    payload = due[0]
+                    # Move to backup and remove from ZSET
+                    await redis.zrem(get_retry_zset_key(distribute_qname), payload)
+                    await redis.lpush(get_redis_q_key(distribute_qname), payload)
+                    # Continue loop to process as normal
+            except Exception:
+                pass
             continue
 
         data = deserialize(value)
@@ -200,6 +232,7 @@ async def async_worker(stop_event: Optional[asyncio.Event] = None):
                 try:
                     meta = deserialize(moved)
                     meta.status = 'submitted'
+                    # When shutting down, retry attempts remain as-is
                     await r.set(get_task_key(meta.id), serialize(meta))
                 except Exception:
                     # best effort

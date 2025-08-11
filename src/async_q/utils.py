@@ -4,7 +4,7 @@ import functools
 import importlib
 import logging
 import pathlib
-from typing import Any
+from typing import Any, Optional
 
 import msgpack
 
@@ -18,6 +18,12 @@ class TaskMetaData:
     args: list
     kwargs: dict
     status: str
+    attempt: int = 0
+    max_retries: int = 0
+    backoff_base: float = 1.0
+    backoff_factor: float = 2.0
+    backoff_max: float = 60.0
+    next_retry_at: Optional[float] = None
     
 
 @dataclasses.dataclass
@@ -62,6 +68,12 @@ def get_redis_q_backup_key(extra:str=''):
 
 def get_task_key(extra:str=''):
     return 'async-q-task:'+extra
+
+def get_retry_zset_key(extra: str = ''):
+    return 'async_task_retry:'+extra
+
+def get_dead_letter_key(extra: str = ''):
+    return 'async_task_dead:'+extra
 
 async def to_thread(func, /, *args, **kwargs):
     """Asynchronously run function *func* in a separate thread.
