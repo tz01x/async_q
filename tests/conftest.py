@@ -3,6 +3,7 @@ import sys
 import asyncio
 
 import pytest
+import pytest_asyncio
 
 # Ensure `src` is on sys.path before tests import modules
 _project_root = os.path.dirname(os.path.dirname(__file__))
@@ -20,6 +21,15 @@ def reset_async_task_queue():
     aq.AsyncTaskQueue._instance = None
 
 
+@pytest.fixture
+def fake_ack_scripts(monkeypatch):
+    """Swap the ack scripts for FakeAsyncRedis-compatible stand-ins."""
+    from async_q import scripts
+    from fakes import fake_fail_ack, fake_requeue
+    monkeypatch.setattr(scripts, "requeue", fake_requeue)
+    monkeypatch.setattr(scripts, "fail_ack", fake_fail_ack)
+
+
 @pytest.fixture(scope="session")
 def event_loop():
     # Create a fresh event loop for the test session
@@ -28,3 +38,14 @@ def event_loop():
     loop.close()
 
 
+@pytest_asyncio.fixture
+async def real_redis():
+    url = os.getenv("ASYNC_Q_TEST_REDIS_URL")
+    if not url:
+        pytest.skip("set ASYNC_Q_TEST_REDIS_URL to run Redis integration tests")
+    import redis.asyncio as aioredis
+    r = aioredis.Redis.from_url(url)
+    await r.flushdb()
+    yield r
+    await r.flushdb()
+    await (getattr(r, "aclose", None) or r.close)()

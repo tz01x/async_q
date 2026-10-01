@@ -3,8 +3,11 @@ import contextvars
 import functools
 import importlib
 import logging
+import os
 import pathlib
-from typing import Any, Optional
+import secrets
+import socket
+from typing import Any, Dict, Optional
 
 import msgpack
 
@@ -46,6 +49,7 @@ def get_module_ref(path):
     return module
 
 
+@functools.lru_cache(maxsize=None)  # ponytail: unbounded; one entry per task function, bounded by codebase size
 def get_function_ref(path, func_name):
     module = get_module_ref(path)
     return getattr(module, func_name)
@@ -60,20 +64,40 @@ def deserialize(byte_value) -> TaskMetaData:
     val_dict = msgpack.unpackb(byte_value, raw=False)
     return TaskMetaData(**val_dict)
 
-def get_redis_q_key(extra:str=''):
-    return 'async_task:'+extra
+# Per-queue keys carry a {q} hash tag so every key of one queue lands in the
+# same Redis Cluster slot (required for BRPOPLPUSH and the Lua scripts).
+def get_redis_q_key(q: str = ''):
+    return 'async_task:{' + q + '}'
 
-def get_redis_q_backup_key(extra:str=''):
-    return 'async_task_backup:'+extra
+def get_redis_q_backup_key(q: str = '', wid: str = ''):
+    return 'async_task_backup:{' + q + '}:' + wid
 
-def get_task_key(extra:str=''):
-    return 'async-q-task:'+extra
+def get_task_key(extra: str = ''):
+    return 'async-q-task:' + extra
 
-def get_retry_zset_key(extra: str = ''):
-    return 'async_task_retry:'+extra
+def get_retry_zset_key(q: str = ''):
+    return 'async_task_retry:{' + q + '}'
 
-def get_dead_letter_key(extra: str = ''):
-    return 'async_task_dead:'+extra
+def get_dead_letter_key(q: str = ''):
+    return 'async_task_dead:{' + q + '}'
+
+def get_heartbeat_key(q: str, wid: str):
+    return 'async_task_hb:{' + q + '}:' + wid
+
+def get_workers_key(q: str):
+    return 'async_task_workers:{' + q + '}'
+
+def get_legacy_keys(q: str) -> Dict[str, str]:
+    """Pre-0.3.0 key names. # ponytail: drain support for one release, then delete"""
+    return {
+        'main': 'async_task:' + q,
+        'backup': 'async_task_backup:' + q,
+        'retry': 'async_task_retry:' + q,
+        'dead': 'async_task_dead:' + q,
+    }
+
+def new_worker_id() -> str:
+    return f'{socket.gethostname()}-{os.getpid()}-{secrets.token_hex(3)}'
 
 async def to_thread(func, /, *args, **kwargs):
     """Asynchronously run function *func* in a separate thread.

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "async_q"
-version = "0.2.1"
+version = "0.3.0"
 authors = [
   { name="tumzied_", email="abdur.rahman.tumzied.ewu@gmail.com" },
 ]
@@ -21,6 +21,9 @@ dependencies = [
   "redis>=5,<6",
   "msgpack>=1.0,<2",
 ]
+
+[project.scripts]
+async_q = "async_q.__main__:main"
 
 [project.urls]
 "Homepage" = "https://github.com/tz01x/async_q"
