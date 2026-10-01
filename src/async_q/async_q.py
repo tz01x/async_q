@@ -91,6 +91,10 @@ def submit_task(
     args: Optional[List[object]] = None,
     kwargs: Optional[Dict[str, object]] = None,
     queue_name: str = 'default',
+    max_retries: int = 0,
+    backoff_base: float = 1.0,
+    backoff_factor: float = 2.0,
+    backoff_max: float = 60.0,
 ) -> None:
     """Submit a coroutine function for asynchronous execution.
 
@@ -99,12 +103,19 @@ def submit_task(
         args: positional arguments for the task
         kwargs: keyword arguments for the task
         queue_name: target queue name
+        max_retries: retries after the first failure before moving to the DLQ
+        backoff_base: delay in seconds before the first retry
+        backoff_factor: multiplier applied to the delay on each further retry
+        backoff_max: upper bound on the retry delay in seconds
     """
     if not AsyncTaskQueue._instance:
         raise Exception('AsyncTaskQueue did not initiated')
 
     if not inspect.iscoroutinefunction(func):
         raise TypeError('submit_task requires an async function (coroutine)')
+
+    if max_retries < 0:
+        raise ValueError('max_retries must be >= 0')
 
     r = AsyncTaskQueue._instance.redis_builder.get_redis()
 
@@ -115,6 +126,10 @@ def submit_task(
         'args': [] if args is None else args,
         'kwargs': {} if kwargs is None else kwargs,
         'status': 'submitted',
+        'max_retries': max_retries,
+        'backoff_base': backoff_base,
+        'backoff_factor': backoff_factor,
+        'backoff_max': backoff_max,
     }
     byte_data: bytes = serialize(TaskMetaData(**value))
     r.lpush(get_redis_q_key(queue_name), byte_data)

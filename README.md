@@ -73,7 +73,8 @@ if __name__ == '__main__':
      for i in range(20):
          # Submit a task with an explicit queue name
          submit_task(my_task, kwargs={'idx': i, 'delay': 10}, queue_name='default')
-         # You can control retries by setting defaults in your task payload later (max_retries, backoff_* fields)
+         # Retry up to 3 times (delays 1s, 2s, 4s, capped at backoff_max) before moving to the DLQ
+         submit_task(my_task, kwargs={'idx': i}, max_retries=3, backoff_base=1.0, backoff_factor=2.0, backoff_max=60.0)
 ```
 
 ### Running Worker Processes
@@ -88,6 +89,12 @@ In order to efficiently handle incoming tasks, it's crucial to set up and launch
 
 ```bash
 python -m async_q -a main_app.py:async_q_app -c 5
+```
+
+Installing the package also provides an `async_q` command, equivalent to `python -m async_q`:
+
+```bash
+async_q -a main_app.py:async_q_app -c 5
 ```
 
 - Dotted module path (portable across machines):

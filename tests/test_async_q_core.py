@@ -57,3 +57,34 @@ def test_submit_task_pushes_to_redis(monkeypatch, reset_async_task_queue):
     assert data.id and isinstance(data.id, str)
 
 
+
+
+def _app(monkeypatch):
+    import async_q.async_q as aq
+    monkeypatch.setattr(aq.redis, "Redis", FakeRedis)
+    rb = RedisBuilder()
+    AsyncTaskQueue(redis_builder=rb)
+    return rb
+
+
+def test_submit_task_sets_retry_options(monkeypatch, reset_async_task_queue):
+    rb = _app(monkeypatch)
+
+    async def t():
+        pass
+
+    submit_task(t, max_retries=3, backoff_base=0.5, backoff_factor=3.0, backoff_max=10.0)
+    data = deserialize(rb.get_redis().lists[get_redis_q_key("default")][0])
+    assert (data.max_retries, data.backoff_base, data.backoff_factor, data.backoff_max) == (3, 0.5, 3.0, 10.0)
+    assert data.attempt == 0
+
+
+def test_submit_task_rejects_negative_retries(monkeypatch, reset_async_task_queue):
+    rb = _app(monkeypatch)
+
+    async def t():
+        pass
+
+    with pytest.raises(ValueError):
+        submit_task(t, max_retries=-1)
+    assert rb.get_redis().lists == {}

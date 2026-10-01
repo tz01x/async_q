@@ -22,5 +22,8 @@ dependencies = [
   "msgpack>=1.0,<2",
 ]
 
+[project.scripts]
+async_q = "async_q.__main__:main"
+
 [project.urls]
 "Homepage" = "https://github.com/tz01x/async_q"

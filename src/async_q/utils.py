@@ -46,6 +46,7 @@ def get_module_ref(path):
     return module
 
 
+@functools.lru_cache(maxsize=None)  # ponytail: unbounded; one entry per task function, bounded by codebase size
 def get_function_ref(path, func_name):
     module = get_module_ref(path)
     return getattr(module, func_name)

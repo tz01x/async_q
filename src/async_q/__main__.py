@@ -5,6 +5,7 @@ import signal
 import os
 import importlib
 import pathlib
+from typing import List, Optional
 
 from .utils import get_module_ref
 from .async_worker import async_worker
@@ -38,7 +39,7 @@ def resolve_app(app_spec: str) -> AsyncTaskQueue:
     return async_task_queue
 
 
-if __name__ == "__main__":
+def main(argv: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Async task queue worker")
     parser.add_argument(
         "-a",
@@ -64,7 +65,7 @@ if __name__ == "__main__":
                         required=False,
                         help='set log file path `-lf ./logs/async-q.log`')
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     app_spec = args.app or os.getenv('ASYNC_Q_APP')
     if not app_spec:
@@ -80,9 +81,10 @@ if __name__ == "__main__":
     )
     async_task_queue.distribute_qname = args.queue
 
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
         async_task_queue.logger.info(f'Starting workers with {args.concurrency} concurrency')
-        loop = asyncio.get_event_loop()
 
         stop_event = asyncio.Event()
 
@@ -108,3 +110,8 @@ if __name__ == "__main__":
         async_task_queue.logger.error("__main__: %s", e)
     finally:
         loop.run_until_complete(close())
+        loop.close()
+
+
+if __name__ == "__main__":
+    main()
